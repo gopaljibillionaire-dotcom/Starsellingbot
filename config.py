@@ -32,5 +32,5 @@ CRYPTO_ADDRESSES = {
 }
 
 # Deposit Limits (USD)
-MIN_DEPOSIT = float(os.getenv("MIN_DEPOSIT", 1.0))
+MIN_DEPOSIT = float(os.getenv("MIN_DEPOSIT", 5.0))
 MAX_DEPOSIT = float(os.getenv("MAX_DEPOSIT", 1000.0))
