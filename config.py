@@ -28,7 +28,8 @@ CRYPTO_ADDRESSES = {
     "SOL": os.getenv("SOL_ADDRESS", "22VMfn5tnoNQPyjtd9ek7J9siAdntpRzcAUJymcEoXkU"),
     "ETH": os.getenv("ETH_ADDRESS", "0xAA11eB52e72510aaD12434F946dbB05b56599C65"),
     "LTC": os.getenv("LTC_ADDRESS", "LhJzjDFXwrSAuM9bLUXwNrWGkrEKfsgBRt"),
-    "BNB": os.getenv("BNB_ADDRESS", "0xAA11eB52e72510aaD12434F946dbB05b56599C65")
+    "BNB": os.getenv("BNB_ADDRESS", "0xAA11eB52e72510aaD12434F946dbB05b56599C65"),
+     "TON": os.getenv("BNB_ADDRESS", "UQDJHPE6JBKR7Ou_6BjhYAtAPfLm5O2lqWgyJTbSEP1OiUoK")
 }
 
 # Deposit Limits (USD)
