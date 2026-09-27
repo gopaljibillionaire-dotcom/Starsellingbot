@@ -31,6 +31,7 @@ WELCOME_IMG = "https://i.ibb.co/My1BkdpV/file-0000000064bc81fa8bb2f564b659595c.p
 PROFILE_IMG = "https://i.ibb.co/v676k8DR/file-00000000203c81fa91ce6bf539ba341e.png"
 WALLET_IMG = "https://i.ibb.co/5W2WG0sJ/file-00000000d33481f588663976b70e3955.png"
 SETTINGS_IMG = "https://i.ibb.co/27qkfwJB/file-0000000091a881fa820cc7d0a6196bc9.png"
+BUY_STARS_IMG = "https://i.ibb.co/v6XtXbCm/file-00000000e2e4820b81dc1c9bfa29fe93.png"
 
 # Initialize Bot, DB, and Router
 bot = Bot(token=config.BOT_TOKEN)
@@ -338,15 +339,16 @@ async def cb_profile(callback: CallbackQuery):
     lang = await get_user_lang(user_id)
 
     order_count = await orders_col.count_documents({"user_id": user_id})
-    reg_date = user.get("joined_at", datetime.now()).strftime("%Y-%m-%d")
+    joined_time = user.get("joined_at") if user else None
+    reg_date = joined_time.strftime("%Y-%m-%d") if joined_time else "N/A"
 
     text = I18N[lang]["profile_text"].format(
-        first_name=user.get("first_name", "User"),
-        username=user.get("username", "N/A"),
+        first_name=user.get("first_name", "User") if user else "User",
+        username=user.get("username", "N/A") if user else "N/A",
         user_id=user_id,
-        balance=user.get("balance", 0.0),
-        total_deposits=user.get("total_deposits", 0.0),
-        total_stars=user.get("total_stars", 0),
+        balance=user.get("balance", 0.0) if user else 0.0,
+        total_deposits=user.get("total_deposits", 0.0) if user else 0.0,
+        total_stars=user.get("total_stars", 0) if user else 0,
         total_orders=order_count,
         reg_date=reg_date
     )
@@ -379,10 +381,11 @@ async def cb_my_orders(callback: CallbackQuery):
 
     text = "<b>📦 Purchase History:</b>\n\n"
     for o in orders:
+        created_date = o['created_at'].strftime('%Y-%m-%d') if isinstance(o['created_at'], datetime) else "N/A"
         text += (
             f"• <b>Order #{o['order_id']}</b>\n"
             f"  Stars: {o['stars']} ⭐ | Price: ${o['price']:.2f}\n"
-            f"  Status: <code>{o['status']}</code> | Date: {o['created_at'].strftime('%Y-%m-%d')}\n\n"
+            f"  Status: <code>{o['status']}</code> | Date: {created_date}\n\n"
         )
 
     nav_btns = []
@@ -396,7 +399,10 @@ async def cb_my_orders(callback: CallbackQuery):
         kb.append(nav_btns)
     kb.append([create_button(I18N[lang]["back"], "user_profile", "primary")])
 
-    await callback.message.edit_caption(caption=text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
+    await callback.message.edit_media(
+        media=InputMediaPhoto(media=PROFILE_IMG, caption=text, parse_mode="HTML"),
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=kb)
+    )
 
 # --- Wallet & Deposit Flow ---
 @router.callback_query(F.data == "user_wallet")
@@ -406,8 +412,8 @@ async def cb_wallet(callback: CallbackQuery):
     lang = await get_user_lang(user_id)
 
     text = I18N[lang]["wallet_info"].format(
-        balance=user.get("balance", 0.0),
-        total_deposits=user.get("total_deposits", 0.0)
+        balance=user.get("balance", 0.0) if user else 0.0,
+        total_deposits=user.get("total_deposits", 0.0) if user else 0.0
     )
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [create_button(I18N[lang]["topup"], "user_topup", "success")],
@@ -443,7 +449,7 @@ async def process_deposit_amount(message: Message, state: FSMContext):
         [create_button("BNB (Binance Coin)", "pay_BNB", "primary")],
         [create_button(I18N[lang]["back"], "main_menu", "danger")]
     ])
-    await message.answer(I18N[lang]["select_crypto"], reply_markup=kb)
+    await message.answer_photo(photo=WALLET_IMG, caption=I18N[lang]["select_crypto"], reply_markup=kb)
 
 @router.callback_query(F.data.startswith("pay_"))
 async def process_crypto_payment(callback: CallbackQuery, state: FSMContext):
@@ -484,7 +490,19 @@ async def process_crypto_payment(callback: CallbackQuery, state: FSMContext):
         [create_button(I18N[lang]["back"], "main_menu", "primary")]
     ])
     await state.clear()
-    await callback.message.edit_text(text, parse_mode="HTML", reply_markup=kb)
+    
+    if callback.message.photo:
+        await callback.message.edit_media(
+            media=InputMediaPhoto(media=WALLET_IMG, caption=text, parse_mode="HTML"),
+            reply_markup=kb
+        )
+    else:
+        await callback.message.answer_photo(
+            photo=WALLET_IMG,
+            caption=text,
+            parse_mode="HTML",
+            reply_markup=kb
+        )
 
 # --- Payment Proof Upload Flow ---
 @router.callback_query(F.data.startswith("ihavepaid_"))
@@ -530,12 +548,16 @@ async def process_proof_photo_upload(message: Message, state: FSMContext):
     await message.answer(msg, parse_mode="HTML", reply_markup=kb)
 
     # Forward Proof directly to Admins for manual review
+    usd_val = deposit.get('usd_amount', 0.0) if deposit else 0.0
+    crypto_val = deposit.get('crypto_amount', 0.0) if deposit else 0.0
+    crypto_sym = deposit.get('crypto', 'CRYPTO') if deposit else 'CRYPTO'
+
     admin_caption = (
         f"🚨 <b>NEW DEPOSIT VERIFICATION REQUEST</b>\n\n"
         f"<b>Deposit ID:</b> <code>{deposit_id}</code>\n"
         f"<b>User ID:</b> <code>{user_id}</code> (@{message.from_user.username or 'N/A'})\n"
-        f"<b>Amount:</b> ${deposit.get('usd_amount', 0.0):.2f} USD\n"
-        f"<b>Crypto:</b> {deposit.get('crypto_amount', 0.0):.6f} {deposit.get('crypto')}\n"
+        f"<b>Amount:</b> ${usd_val:.2f} USD\n"
+        f"<b>Crypto:</b> {crypto_val:.6f} {crypto_sym}\n"
         f"<b>TX ID:</b> <code>{tx_id}</code>"
     )
 
@@ -574,7 +596,7 @@ async def cb_approve_deposit(callback: CallbackQuery):
         )
 
         await callback.answer("Deposit Approved & Credited!", show_alert=True)
-        await callback.message.edit_caption(caption=callback.message.caption + "\n\n🟢 <b>APPROVED BY ADMIN</b>", parse_mode="HTML")
+        await callback.message.edit_caption(caption=(callback.message.caption or "") + "\n\n🟢 <b>APPROVED BY ADMIN</b>", parse_mode="HTML")
 
         try:
             await bot.send_message(
@@ -600,7 +622,7 @@ async def cb_reject_deposit(callback: CallbackQuery):
 
     if deposit:
         await callback.answer("Deposit Rejected!", show_alert=True)
-        await callback.message.edit_caption(caption=callback.message.caption + "\n\n🔴 <b>REJECTED BY ADMIN</b>", parse_mode="HTML")
+        await callback.message.edit_caption(caption=(callback.message.caption or "") + "\n\n🔴 <b>REJECTED BY ADMIN</b>", parse_mode="HTML")
         try:
             await bot.send_message(
                 deposit["user_id"],
@@ -627,9 +649,11 @@ async def cb_buy_stars_catalog(callback: CallbackQuery):
     total_packs = await packs_col.count_documents({"enabled": True})
 
     if not packs:
-        await callback.message.answer(
-            "⚠️ No Stars packs are available right now. Check back later!",
-            reply_markup=InlineKeyboardMarkup(inline_keyboard=[[create_button(I18N[lang]["back"], "main_menu", "primary")]])
+        text = "⚠️ No Stars packs are available right now. Check back later!"
+        kb = InlineKeyboardMarkup(inline_keyboard=[[create_button(I18N[lang]["back"], "main_menu", "primary")]])
+        await callback.message.edit_media(
+            media=InputMediaPhoto(media=BUY_STARS_IMG, caption=text, parse_mode="HTML"),
+            reply_markup=kb
         )
         return
 
@@ -648,13 +672,16 @@ async def cb_buy_stars_catalog(callback: CallbackQuery):
         kb.append(nav)
     kb.append([create_button(I18N[lang]["back"], "main_menu", "primary")])
 
-    await callback.message.answer("<b>⭐ Available Stars Packages:</b>\nSelect a pack to proceed:", parse_mode="HTML", reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
+    text = "<b>⭐ Available Stars Packages:</b>\nSelect a pack to proceed:"
+    await callback.message.edit_media(
+        media=InputMediaPhoto(media=BUY_STARS_IMG, caption=text, parse_mode="HTML"),
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=kb)
+    )
 
 @router.callback_query(F.data.startswith("buy_pack_"))
 async def cb_buy_pack_confirm(callback: CallbackQuery):
     pack_id = callback.data.split("buy_pack_")[1]
     user_id = callback.from_user.id
-    lang = await get_user_lang(user_id)
 
     pack = await packs_col.find_one({"_id": ObjectId(pack_id)})
     if not pack:
@@ -672,7 +699,10 @@ async def cb_buy_pack_confirm(callback: CallbackQuery):
         [create_button("✅ Confirm & Pay", f"confirm_purchase_{pack_id}", "success")],
         [create_button("❌ Cancel", "user_buy_stars", "danger")]
     ])
-    await callback.message.edit_text(text, parse_mode="HTML", reply_markup=kb)
+    await callback.message.edit_media(
+        media=InputMediaPhoto(media=BUY_STARS_IMG, caption=text, parse_mode="HTML"),
+        reply_markup=kb
+    )
 
 @router.callback_query(F.data.startswith("confirm_purchase_"))
 async def process_purchase(callback: CallbackQuery):
@@ -699,7 +729,10 @@ async def process_purchase(callback: CallbackQuery):
             [create_button(I18N[lang]["topup"], "user_topup", "success")],
             [create_button(I18N[lang]["back"], "user_buy_stars", "primary")]
         ])
-        await callback.message.edit_text(I18N[lang]["insufficient_balance"], reply_markup=kb)
+        await callback.message.edit_media(
+            media=InputMediaPhoto(media=BUY_STARS_IMG, caption=I18N[lang]["insufficient_balance"], parse_mode="HTML"),
+            reply_markup=kb
+        )
         return
 
     order_id = f"ORD-{uuid.uuid4().hex[:8].upper()}"
@@ -731,7 +764,10 @@ async def process_purchase(callback: CallbackQuery):
         [create_button(I18N[lang]["back"], "main_menu", "primary")]
     ])
 
-    await callback.message.edit_text(success_msg, parse_mode="HTML", reply_markup=kb)
+    await callback.message.edit_media(
+        media=InputMediaPhoto(media=BUY_STARS_IMG, caption=success_msg, parse_mode="HTML"),
+        reply_markup=kb
+    )
 
 # --- Admin Panel & Management ---
 def check_admin(user_id: int) -> bool:
@@ -749,14 +785,25 @@ async def cb_admin_panel(callback: CallbackQuery):
         [create_button("📊 Statistics", "admin_stats", "primary")],
         [create_button("⬅️ Main Menu", "main_menu", "primary")]
     ])
-    await callback.message.answer("<b>👑 Admin Control Panel</b>\nSelect an option to manage the store:", parse_mode="HTML", reply_markup=kb)
+    text = "<b>👑 Admin Control Panel</b>\nSelect an option to manage the store:"
+    if callback.message.photo:
+        await callback.message.edit_media(
+            media=InputMediaPhoto(media=WELCOME_IMG, caption=text, parse_mode="HTML"),
+            reply_markup=kb
+        )
+    else:
+        await callback.message.edit_text(text, parse_mode="HTML", reply_markup=kb)
 
 # Admin: Add Pack FSM
 @router.callback_query(F.data == "admin_add_pack")
 async def cb_admin_add_pack(callback: CallbackQuery, state: FSMContext):
     if not check_admin(callback.from_user.id): return
     await state.set_state(AdminPackStates.waiting_for_stars)
-    await callback.message.edit_text("<b>[Admin]</b> Enter the quantity of Telegram Stars for this pack (e.g. 200):", parse_mode="HTML")
+    msg = "<b>[Admin]</b> Enter the quantity of Telegram Stars for this pack (e.g. 200):"
+    if callback.message.photo:
+        await callback.message.edit_caption(caption=msg, parse_mode="HTML")
+    else:
+        await callback.message.edit_text(msg, parse_mode="HTML")
 
 @router.message(AdminPackStates.waiting_for_stars)
 async def process_admin_stars(message: Message, state: FSMContext):
@@ -800,7 +847,10 @@ async def cb_admin_manage_packs(callback: CallbackQuery):
         kb.append([create_button(f"🗑️ Delete {p['stars']} Stars", f"admin_del_pack_{str(p['_id'])}", "danger")])
 
     kb.append([create_button("⬅️ Back", "admin_main", "primary")])
-    await callback.message.edit_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
+    if callback.message.photo:
+        await callback.message.edit_caption(caption=text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
+    else:
+        await callback.message.edit_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
 
 @router.callback_query(F.data.startswith("admin_del_pack_"))
 async def cb_admin_delete_pack(callback: CallbackQuery):
@@ -837,7 +887,10 @@ async def cb_admin_orders(callback: CallbackQuery):
     if nav: kb.append(nav)
     kb.append([create_button("⬅️ Admin Menu", "admin_main", "primary")])
 
-    await callback.message.edit_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
+    if callback.message.photo:
+        await callback.message.edit_caption(caption=text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
+    else:
+        await callback.message.edit_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
 
 @router.callback_query(F.data.startswith("adm_app_ord_"))
 async def cb_admin_approve_order(callback: CallbackQuery):
@@ -887,7 +940,11 @@ async def cb_admin_reject_order(callback: CallbackQuery):
 async def cb_broadcast_start(callback: CallbackQuery, state: FSMContext):
     if not check_admin(callback.from_user.id): return
     await state.set_state(AdminBroadcastStates.waiting_for_content)
-    await callback.message.edit_text("<b>📢 Broadcast Mode</b>\nSend any text, photo, or video to broadcast to all users.", parse_mode="HTML")
+    text = "<b>📢 Broadcast Mode</b>\nSend any text, photo, or video to broadcast to all users."
+    if callback.message.photo:
+        await callback.message.edit_caption(caption=text, parse_mode="HTML")
+    else:
+        await callback.message.edit_text(text, parse_mode="HTML")
 
 @router.message(AdminBroadcastStates.waiting_for_content)
 async def process_broadcast_content(message: Message, state: FSMContext):
@@ -912,7 +969,10 @@ async def process_broadcast_execute(callback: CallbackQuery, state: FSMContext):
     users = await users_col.find({}, {"user_id": 1}).to_list(length=100000)
     success, failed = 0, 0
 
-    await callback.message.edit_text("⏳ Broadcast in progress... Please wait.")
+    if callback.message.photo:
+        await callback.message.edit_caption(caption="⏳ Broadcast in progress... Please wait.")
+    else:
+        await callback.message.edit_text("⏳ Broadcast in progress... Please wait.")
 
     for u in users:
         try:
@@ -923,7 +983,11 @@ async def process_broadcast_execute(callback: CallbackQuery, state: FSMContext):
             failed += 1
 
     kb = InlineKeyboardMarkup(inline_keyboard=[[create_button("⬅️ Admin Menu", "admin_main", "primary")]])
-    await callback.message.edit_text(f"✅ <b>Broadcast Completed!</b>\n\n<b>Successful:</b> {success}\n<b>Failed:</b> {failed}", parse_mode="HTML", reply_markup=kb)
+    res_text = f"✅ <b>Broadcast Completed!</b>\n\n<b>Successful:</b> {success}\n<b>Failed:</b> {failed}"
+    if callback.message.photo:
+        await callback.message.edit_caption(caption=res_text, parse_mode="HTML", reply_markup=kb)
+    else:
+        await callback.message.edit_text(res_text, parse_mode="HTML", reply_markup=kb)
 
 # Admin: Stats
 @router.callback_query(F.data == "admin_stats")
@@ -956,7 +1020,10 @@ async def cb_admin_stats(callback: CallbackQuery):
     )
 
     kb = InlineKeyboardMarkup(inline_keyboard=[[create_button("⬅️ Back", "admin_main", "primary")]])
-    await callback.message.edit_text(stats_text, parse_mode="HTML", reply_markup=kb)
+    if callback.message.photo:
+        await callback.message.edit_caption(caption=stats_text, parse_mode="HTML", reply_markup=kb)
+    else:
+        await callback.message.edit_text(stats_text, parse_mode="HTML", reply_markup=kb)
 
 # Startup DB Initialization
 async def on_startup():
