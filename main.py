@@ -15,6 +15,7 @@ from aiogram.types import (
     CallbackQuery,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
+    InputMediaPhoto,
     Message
 )
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -24,6 +25,12 @@ import config
 # Logging setup
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
+
+# Image URLs
+WELCOME_IMG = "https://i.ibb.co/My1BkdpV/file-0000000064bc81fa8bb2f564b659595c.png"
+PROFILE_IMG = "https://i.ibb.co/v676k8DR/file-00000000203c81fa91ce6bf539ba341e.png"
+WALLET_IMG = "https://i.ibb.co/5W2WG0sJ/file-00000000d33481f588663976b70e3955.png"
+SETTINGS_IMG = "https://i.ibb.co/27qkfwJB/file-0000000091a881fa820cc7d0a6196bc9.png"
 
 # Initialize Bot, DB, and Router
 bot = Bot(token=config.BOT_TOKEN)
@@ -44,9 +51,10 @@ deposits_col = db["deposits"]
 I18N = {
     "en": {
         "welcome": (
-            "Welcome to our Telegram Stars shop!\n\n"
-            "Use our service to buy Telegram Stars at cheaper prices. "
-            "Choose an option below to get started."
+            "<b>Welcome to our Telegram Stars Shop!</b> ⭐\n\n"
+            "Use our service to buy Telegram Stars at the cheapest prices on the market.\n\n"
+            "<blockquote>Best Telegram bot for buying stars at cheap!</blockquote>\n\n"
+            "Choose an option below to get started:"
         ),
         "buy_stars": "⭐ Buy Stars",
         "topup": "💰 Top Up Wallet",
@@ -54,7 +62,7 @@ I18N = {
         "settings": "⚙️ Settings",
         "admin_panel": "👑 Admin Panel",
         "back": "⬅️ Back",
-        "lang_select": "Choose your language / Select your language:",
+        "lang_select": "<b>Choose your language / Select your language:</b>",
         "lang_changed": "✅ Language changed to English!",
         "profile_text": (
             "<b>👤 User Profile</b>\n\n"
@@ -63,7 +71,7 @@ I18N = {
             "<b>User ID:</b> <code>{user_id}</code>\n"
             "<b>Wallet Balance:</b> ${balance:.2f}\n"
             "<b>Total Deposits:</b> ${total_deposits:.2f}\n"
-            "<b>Total Stars Bought:</b> {total_stars}\n"
+            "<b>Total Stars Bought:</b> {total_stars} ⭐\n"
             "<b>Total Orders:</b> {total_orders}\n"
             "<b>Registered:</b> {reg_date}"
         ),
@@ -84,17 +92,26 @@ I18N = {
             "<b>Exchange Rate:</b> 1 {symbol} = ${rate:.2f} USD\n"
             "<b>Network:</b> {crypto}\n\n"
             "<b>Deposit Address:</b>\n<code>{address}</code>\n\n"
-            "<b>Deposit ID:</b> <code>{deposit_id}</code>\n"
-            "⚠️ Send the EXACT amount to the address above before the payment expires."
+            "<b>Deposit ID:</b> <code>{deposit_id}</code>\n\n"
+            "⚠️ Send the EXACT amount to the address above before making payment proof."
         ),
-        "check_payment": "🔄 Check Payment Status",
-        "payment_not_found": "⌛ Payment not detected yet. Please try again after sending funds.",
+        "i_have_paid": "✅ I Have Paid",
+        "enter_tx_id": "Please send your **Transaction ID / TX Hash** for verification:",
+        "upload_proof": "Please upload a clear screenshot of your **Payment Proof**:",
+        "proof_submitted": (
+            "✅ <b>Payment Proof Submitted!</b>\n\n"
+            "Your payment has been forwarded to the administration team for verification.\n\n"
+            "<b>Deposit ID:</b> <code>{deposit_id}</code>\n"
+            "<b>TX ID:</b> <code>{tx_id}</code>\n\n"
+            "After verification by the owner, you will be able to receive your Stars or Wallet balance credited.\n\n"
+            "📩 <b>Send receipt to @exesiners to claim your Stars!</b>"
+        ),
         "insufficient_balance": "❌ Insufficient balance! Please top up your wallet first.",
         "order_success": (
             "✅ <b>You are all set!</b>\n\n"
             "Your order has been successfully placed.\n\n"
-            "Now DM the owner {owner} to claim your Stars. "
-            "Send them the receipt below after approval by the owner, and you will receive all your Stars."
+            "Now DM the owner @exesiners to claim your Stars. "
+            "Send them the receipt below after approval, and you will receive all your Stars."
         ),
         "contact_owner": "💬 Contact Owner",
         "receipt": (
@@ -112,9 +129,10 @@ I18N = {
     },
     "ru": {
         "welcome": (
-            "Добро пожаловать в магазин Telegram Stars!\n\n"
-            "Используйте наш сервис для покупки Звезд Telegram по выгодным ценам. "
-            "Выберите опцию ниже, чтобы начать."
+            "<b>Добро пожаловать в магазин Telegram Stars!</b> ⭐\n\n"
+            "Используйте наш сервис для покупки Звезд Telegram по самым выгодным ценам.\n\n"
+            "<blockquote>Best Telegram bot for buying stars at cheap!</blockquote>\n\n"
+            "Выберите опцию ниже, чтобы начать:"
         ),
         "buy_stars": "⭐ Купить Звезды",
         "topup": "💰 Пополнить Баланс",
@@ -122,7 +140,7 @@ I18N = {
         "settings": "⚙️ Настройки",
         "admin_panel": "👑 Админ Панель",
         "back": "⬅️ Назад",
-        "lang_select": "Выберите язык / Select your language:",
+        "lang_select": "<b>Выберите язык / Select your language:</b>",
         "lang_changed": "✅ Язык успешно изменен на Русский!",
         "profile_text": (
             "<b>👤 Профиль Пользователя</b>\n\n"
@@ -131,7 +149,7 @@ I18N = {
             "<b>ID Пользователя:</b> <code>{user_id}</code>\n"
             "<b>Баланс Кошелька:</b> ${balance:.2f}\n"
             "<b>Всего Пополнено:</b> ${total_deposits:.2f}\n"
-            "<b>Куплено Звезд:</b> {total_stars}\n"
+            "<b>Куплено Звезд:</b> {total_stars} ⭐\n"
             "<b>Всего Заказов:</b> {total_orders}\n"
             "<b>Регистрация:</b> {reg_date}"
         ),
@@ -152,15 +170,24 @@ I18N = {
             "<b>Курс обмена:</b> 1 {symbol} = ${rate:.2f} USD\n"
             "<b>Сеть:</b> {crypto}\n\n"
             "<b>Адрес Пополнения:</b>\n<code>{address}</code>\n\n"
-            "<b>ID Депозита:</b> <code>{deposit_id}</code>\n"
-            "⚠️ Отправьте ТОЧНУЮ сумму на указанный адрес до истечения времени."
+            "<b>ID Депозита:</b> <code>{deposit_id}</code>\n\n"
+            "⚠️ Отправьте ТОЧНУЮ сумму на указанный адрес."
         ),
-        "check_payment": "🔄 Проверить Оплату",
-        "payment_not_found": "⌛ Транзакция не найдена. Попробуйте проверить позже.",
+        "i_have_paid": "✅ Я оплатил",
+        "enter_tx_id": "Пожалуйста, отправьте ваш **Transaction ID / TX Hash** для проверки:",
+        "upload_proof": "Пожалуйста, загрузите скриншот **Подтверждения Оплаты**:",
+        "proof_submitted": (
+            "✅ <b>Чек и доказательство отправлены!</b>\n\n"
+            "Ваш платеж был отправлен администраторам на проверку.\n\n"
+            "<b>ID Депозита:</b> <code>{deposit_id}</code>\n"
+            "<b>TX ID:</b> <code>{tx_id}</code>\n\n"
+            "После проверки владельцем вы сможете получить баланс/звезды.\n\n"
+            "📩 <b>Отправьте чек @exesiners чтобы получить Stars!</b>"
+        ),
         "insufficient_balance": "❌ Недостаточно средств! Пополните баланс.",
         "order_success": (
             "✅ <b>Заказ успешно оформлен!</b>\n\n"
-            "Напишите владельцу {owner}, чтобы получить Stars. "
+            "Напишите владельцу @exesiners, чтобы получить Stars. "
             "Отправьте чек ниже для подтверждения."
         ),
         "contact_owner": "💬 Написать Владельцу",
@@ -181,7 +208,6 @@ I18N = {
 
 # --- Safe Button Helper ---
 def create_button(text: str, callback_data: str, style: str = "primary") -> InlineKeyboardButton:
-    """Safely constructs InlineKeyboardButton with style fallback support."""
     try:
         return InlineKeyboardButton(text=text, callback_data=callback_data, style=style)
     except TypeError:
@@ -190,13 +216,12 @@ def create_button(text: str, callback_data: str, style: str = "primary") -> Inli
 # --- FSM States ---
 class TopUpStates(StatesGroup):
     waiting_for_amount = State()
+    waiting_for_tx_id = State()
+    waiting_for_proof_photo = State()
 
 class AdminPackStates(StatesGroup):
     waiting_for_stars = State()
     waiting_for_price = State()
-
-class AdminUserSearchStates(StatesGroup):
-    waiting_for_query = State()
 
 class AdminBroadcastStates(StatesGroup):
     waiting_for_content = State()
@@ -208,7 +233,6 @@ async def get_user_lang(user_id: int) -> str:
     return user.get("language", config.DEFAULT_LANGUAGE) if user else config.DEFAULT_LANGUAGE
 
 async def get_crypto_price(symbol: str) -> float:
-    """Fetches real-time price from Coinbase public API."""
     symbol_map = {"BTC": "BTC", "ETH": "ETH", "LTC": "LTC", "SOL": "SOL", "BNB": "BNB"}
     ticker = symbol_map.get(symbol, symbol)
     url = f"https://api.coinbase.com/v2/prices/{ticker}-USD/spot"
@@ -220,7 +244,6 @@ async def get_crypto_price(symbol: str) -> float:
                     return float(data["data"]["amount"])
     except Exception as e:
         logger.error(f"Price fetch failed: {e}")
-    # Fallback default prices if API fails
     defaults = {"BTC": 65000.0, "ETH": 3500.0, "LTC": 85.0, "SOL": 140.0, "BNB": 580.0}
     return defaults.get(symbol, 1.0)
 
@@ -264,7 +287,12 @@ async def cmd_start(message: Message):
 
     lang = await get_user_lang(user_id)
     is_admin = user_id in config.ADMIN_IDS
-    await message.answer(I18N[lang]["welcome"], reply_markup=main_menu_keyboard(lang, is_admin))
+    await message.answer_photo(
+        photo=WELCOME_IMG,
+        caption=I18N[lang]["welcome"],
+        parse_mode="HTML",
+        reply_markup=main_menu_keyboard(lang, is_admin)
+    )
 
 # --- Settings & Language Management ---
 @router.callback_query(F.data == "user_settings")
@@ -277,7 +305,10 @@ async def cb_settings(callback: CallbackQuery):
         ],
         [create_button(I18N[lang]["back"], "main_menu", "primary")]
     ])
-    await callback.message.edit_text(I18N[lang]["lang_select"], reply_markup=kb)
+    await callback.message.edit_media(
+        media=InputMediaPhoto(media=SETTINGS_IMG, caption=I18N[lang]["lang_select"], parse_mode="HTML"),
+        reply_markup=kb
+    )
 
 @router.callback_query(F.data.startswith("set_lang_"))
 async def cb_set_language(callback: CallbackQuery):
@@ -285,13 +316,19 @@ async def cb_set_language(callback: CallbackQuery):
     await users_col.update_one({"user_id": callback.from_user.id}, {"$set": {"language": new_lang}})
     is_admin = callback.from_user.id in config.ADMIN_IDS
     await callback.answer(I18N[new_lang]["lang_changed"], show_alert=True)
-    await callback.message.edit_text(I18N[new_lang]["welcome"], reply_markup=main_menu_keyboard(new_lang, is_admin))
+    await callback.message.edit_media(
+        media=InputMediaPhoto(media=WELCOME_IMG, caption=I18N[new_lang]["welcome"], parse_mode="HTML"),
+        reply_markup=main_menu_keyboard(new_lang, is_admin)
+    )
 
 @router.callback_query(F.data == "main_menu")
 async def cb_main_menu(callback: CallbackQuery):
     lang = await get_user_lang(callback.from_user.id)
     is_admin = callback.from_user.id in config.ADMIN_IDS
-    await callback.message.edit_text(I18N[lang]["welcome"], reply_markup=main_menu_keyboard(lang, is_admin))
+    await callback.message.edit_media(
+        media=InputMediaPhoto(media=WELCOME_IMG, caption=I18N[lang]["welcome"], parse_mode="HTML"),
+        reply_markup=main_menu_keyboard(lang, is_admin)
+    )
 
 # --- Profile Section ---
 @router.callback_query(F.data == "user_profile")
@@ -318,7 +355,10 @@ async def cb_profile(callback: CallbackQuery):
         [create_button(I18N[lang]["wallet"], "user_wallet", "primary"), create_button(I18N[lang]["my_orders"], "my_orders_0", "primary")],
         [create_button(I18N[lang]["back"], "main_menu", "primary")]
     ])
-    await callback.message.edit_text(text, parse_mode="HTML", reply_markup=kb)
+    await callback.message.edit_media(
+        media=InputMediaPhoto(media=PROFILE_IMG, caption=text, parse_mode="HTML"),
+        reply_markup=kb
+    )
 
 # --- My Orders Pagination ---
 @router.callback_query(F.data.startswith("my_orders_"))
@@ -356,7 +396,7 @@ async def cb_my_orders(callback: CallbackQuery):
         kb.append(nav_btns)
     kb.append([create_button(I18N[lang]["back"], "user_profile", "primary")])
 
-    await callback.message.edit_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
+    await callback.message.edit_caption(caption=text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
 
 # --- Wallet & Deposit Flow ---
 @router.callback_query(F.data == "user_wallet")
@@ -373,13 +413,16 @@ async def cb_wallet(callback: CallbackQuery):
         [create_button(I18N[lang]["topup"], "user_topup", "success")],
         [create_button(I18N[lang]["back"], "user_profile", "primary")]
     ])
-    await callback.message.edit_text(text, parse_mode="HTML", reply_markup=kb)
+    await callback.message.edit_media(
+        media=InputMediaPhoto(media=WALLET_IMG, caption=text, parse_mode="HTML"),
+        reply_markup=kb
+    )
 
 @router.callback_query(F.data == "user_topup")
 async def cb_topup_start(callback: CallbackQuery, state: FSMContext):
     lang = await get_user_lang(callback.from_user.id)
     await state.set_state(TopUpStates.waiting_for_amount)
-    await callback.message.edit_text(I18N[lang]["enter_deposit_amount"])
+    await callback.message.answer(I18N[lang]["enter_deposit_amount"])
 
 @router.message(TopUpStates.waiting_for_amount)
 async def process_deposit_amount(message: Message, state: FSMContext):
@@ -422,7 +465,7 @@ async def process_crypto_payment(callback: CallbackQuery, state: FSMContext):
         "crypto": symbol,
         "crypto_amount": crypto_amount,
         "address": address,
-        "status": "pending",
+        "status": "pending_proof",
         "created_at": datetime.now(timezone.utc)
     })
 
@@ -437,24 +480,137 @@ async def process_crypto_payment(callback: CallbackQuery, state: FSMContext):
     )
 
     kb = InlineKeyboardMarkup(inline_keyboard=[
-        [create_button(I18N[lang]["check_payment"], f"verify_dep_{deposit_id}", "success")],
+        [create_button(I18N[lang]["i_have_paid"], f"ihavepaid_{deposit_id}", "success")],
         [create_button(I18N[lang]["back"], "main_menu", "primary")]
     ])
     await state.clear()
     await callback.message.edit_text(text, parse_mode="HTML", reply_markup=kb)
 
-@router.callback_query(F.data.startswith("verify_dep_"))
-async def verify_deposit(callback: CallbackQuery):
-    deposit_id = callback.data.split("verify_dep_")[1]
+# --- Payment Proof Upload Flow ---
+@router.callback_query(F.data.startswith("ihavepaid_"))
+async def process_i_have_paid(callback: CallbackQuery, state: FSMContext):
+    deposit_id = callback.data.split("ihavepaid_")[1]
     lang = await get_user_lang(callback.from_user.id)
-    deposit = await deposits_col.find_one({"deposit_id": deposit_id})
+    await state.update_data(current_dep_id=deposit_id)
+    await state.set_state(TopUpStates.waiting_for_tx_id)
+    await callback.message.answer(I18N[lang]["enter_tx_id"], parse_mode="Markdown")
 
-    if deposit and deposit.get("status") == "completed":
-        await callback.answer("✅ Payment verified and credited!", show_alert=True)
-        return
+@router.message(TopUpStates.waiting_for_tx_id)
+async def process_tx_id_input(message: Message, state: FSMContext):
+    lang = await get_user_lang(message.from_user.id)
+    tx_id = message.text.strip()
+    await state.update_data(tx_id=tx_id)
+    await state.set_state(TopUpStates.waiting_for_proof_photo)
+    await message.answer(I18N[lang]["upload_proof"], parse_mode="Markdown")
 
-    # In production, integrate blockchain API verification here.
-    await callback.answer(I18N[lang]["payment_not_found"], show_alert=True)
+@router.message(TopUpStates.waiting_for_proof_photo, F.photo)
+async def process_proof_photo_upload(message: Message, state: FSMContext):
+    user_id = message.from_user.id
+    lang = await get_user_lang(user_id)
+    data = await state.get_data()
+
+    deposit_id = data.get("current_dep_id")
+    tx_id = data.get("tx_id")
+    photo_file_id = message.photo[-1].file_id
+
+    # Update database status
+    deposit = await deposits_col.find_one_and_update(
+        {"deposit_id": deposit_id},
+        {"$set": {"status": "pending_approval", "tx_id": tx_id, "photo_id": photo_file_id}}
+    )
+
+    await state.clear()
+
+    # Form user receipt message
+    msg = I18N[lang]["proof_submitted"].format(deposit_id=deposit_id, tx_id=tx_id)
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="💬 Contact Owner", url="https://t.me/exesiners")],
+        [create_button(I18N[lang]["back"], "main_menu", "primary")]
+    ])
+    await message.answer(msg, parse_mode="HTML", reply_markup=kb)
+
+    # Forward Proof directly to Admins for manual review
+    admin_caption = (
+        f"🚨 <b>NEW DEPOSIT VERIFICATION REQUEST</b>\n\n"
+        f"<b>Deposit ID:</b> <code>{deposit_id}</code>\n"
+        f"<b>User ID:</b> <code>{user_id}</code> (@{message.from_user.username or 'N/A'})\n"
+        f"<b>Amount:</b> ${deposit.get('usd_amount', 0.0):.2f} USD\n"
+        f"<b>Crypto:</b> {deposit.get('crypto_amount', 0.0):.6f} {deposit.get('crypto')}\n"
+        f"<b>TX ID:</b> <code>{tx_id}</code>"
+    )
+
+    admin_kb = InlineKeyboardMarkup(inline_keyboard=[
+        [
+            create_button("✅ Approve Deposit", f"adm_app_dep_{deposit_id}", "success"),
+            create_button("❌ Reject Deposit", f"adm_rej_dep_{deposit_id}", "danger")
+        ]
+    ])
+
+    for admin_id in config.ADMIN_IDS:
+        try:
+            await bot.send_photo(admin_id, photo=photo_file_id, caption=admin_caption, parse_mode="HTML", reply_markup=admin_kb)
+        except Exception as e:
+            logger.error(f"Failed sending admin alert to {admin_id}: {e}")
+
+# Admin Deposit Approval / Rejection Handlers
+@router.callback_query(F.data.startswith("adm_app_dep_"))
+async def cb_approve_deposit(callback: CallbackQuery):
+    if callback.from_user.id not in config.ADMIN_IDS: return
+    deposit_id = callback.data.split("adm_app_dep_")[1]
+
+    deposit = await deposits_col.find_one_and_update(
+        {"deposit_id": deposit_id, "status": "pending_approval"},
+        {"$set": {"status": "completed", "approved_at": datetime.now(timezone.utc)}}
+    )
+
+    if deposit:
+        usd_amount = deposit["usd_amount"]
+        user_id = deposit["user_id"]
+
+        # Credit user balance
+        await users_col.update_one(
+            {"user_id": user_id},
+            {"$inc": {"balance": usd_amount, "total_deposits": usd_amount}}
+        )
+
+        await callback.answer("Deposit Approved & Credited!", show_alert=True)
+        await callback.message.edit_caption(caption=callback.message.caption + "\n\n🟢 <b>APPROVED BY ADMIN</b>", parse_mode="HTML")
+
+        try:
+            await bot.send_message(
+                user_id,
+                f"🎉 <b>Deposit Approved!</b>\n\n"
+                f"Your deposit <code>{deposit_id}</code> for ${usd_amount:.2f} USD has been approved! Balance credited to your wallet.",
+                parse_mode="HTML"
+            )
+        except Exception as e:
+            logger.error(f"Failed to alert user: {e}")
+    else:
+        await callback.answer("Deposit already processed.", show_alert=True)
+
+@router.callback_query(F.data.startswith("adm_rej_dep_"))
+async def cb_reject_deposit(callback: CallbackQuery):
+    if callback.from_user.id not in config.ADMIN_IDS: return
+    deposit_id = callback.data.split("adm_rej_dep_")[1]
+
+    deposit = await deposits_col.find_one_and_update(
+        {"deposit_id": deposit_id, "status": "pending_approval"},
+        {"$set": {"status": "rejected", "rejected_at": datetime.now(timezone.utc)}}
+    )
+
+    if deposit:
+        await callback.answer("Deposit Rejected!", show_alert=True)
+        await callback.message.edit_caption(caption=callback.message.caption + "\n\n🔴 <b>REJECTED BY ADMIN</b>", parse_mode="HTML")
+        try:
+            await bot.send_message(
+                deposit["user_id"],
+                f"❌ <b>Deposit Rejected</b>\n\nYour deposit <code>{deposit_id}</code> proof was rejected.",
+                parse_mode="HTML"
+            )
+        except Exception as e:
+            logger.error(f"Failed to alert user: {e}")
+    else:
+        await callback.answer("Deposit already processed.", show_alert=True)
 
 # --- Buy Stars Section ---
 @router.callback_query(F.data.startswith("user_buy_stars"))
@@ -471,7 +627,7 @@ async def cb_buy_stars_catalog(callback: CallbackQuery):
     total_packs = await packs_col.count_documents({"enabled": True})
 
     if not packs:
-        await callback.message.edit_text(
+        await callback.message.answer(
             "⚠️ No Stars packs are available right now. Check back later!",
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[[create_button(I18N[lang]["back"], "main_menu", "primary")]])
         )
@@ -492,7 +648,7 @@ async def cb_buy_stars_catalog(callback: CallbackQuery):
         kb.append(nav)
     kb.append([create_button(I18N[lang]["back"], "main_menu", "primary")])
 
-    await callback.message.edit_text("<b>⭐ Available Stars Packages:</b>\nSelect a pack to proceed:", parse_mode="HTML", reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
+    await callback.message.answer("<b>⭐ Available Stars Packages:</b>\nSelect a pack to proceed:", parse_mode="HTML", reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
 
 @router.callback_query(F.data.startswith("buy_pack_"))
 async def cb_buy_pack_confirm(callback: CallbackQuery):
@@ -568,11 +724,10 @@ async def process_purchase(callback: CallbackQuery):
         date=now.strftime("%Y-%m-%d %H:%M UTC")
     )
 
-    success_msg = I18N[lang]["order_success"].format(owner=config.OWNER_USERNAME) + "\n\n" + receipt
+    success_msg = I18N[lang]["order_success"] + "\n\n" + receipt
 
-    owner_clean = config.OWNER_USERNAME.replace("@", "")
     kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text=I18N[lang]["contact_owner"], url=f"https://t.me/{owner_clean}")],
+        [InlineKeyboardButton(text="💬 Contact Owner (@exesiners)", url="https://t.me/exesiners")],
         [create_button(I18N[lang]["back"], "main_menu", "primary")]
     ])
 
@@ -590,12 +745,11 @@ async def cb_admin_panel(callback: CallbackQuery):
 
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [create_button("➕ Add Pack", "admin_add_pack", "success"), create_button("📦 Manage Packs", "admin_manage_packs", "primary")],
-        [create_button("👥 Users Catalog", "admin_users_0", "primary"), create_button("🔍 Search User", "admin_search_user", "primary")],
-        [create_button("📑 View Orders", "admin_orders_0", "primary"), create_button("📢 Broadcast", "admin_broadcast", "primary")],
-        [create_button("📊 Statistics", "admin_stats", "primary"), create_button("⚙️ DB Tools", "admin_db_tools", "danger")],
+        [create_button("📋 View Orders", "admin_orders_0", "primary"), create_button("📢 Broadcast", "admin_broadcast", "primary")],
+        [create_button("📊 Statistics", "admin_stats", "primary")],
         [create_button("⬅️ Main Menu", "main_menu", "primary")]
     ])
-    await callback.message.edit_text("<b>👑 Admin Control Panel</b>\nSelect an option to manage the store:", parse_mode="HTML", reply_markup=kb)
+    await callback.message.answer("<b>👑 Admin Control Panel</b>\nSelect an option to manage the store:", parse_mode="HTML", reply_markup=kb)
 
 # Admin: Add Pack FSM
 @router.callback_query(F.data == "admin_add_pack")
@@ -673,8 +827,8 @@ async def cb_admin_orders(callback: CallbackQuery):
         text += f"• <b>{o['order_id']}</b> | User: <code>{o['user_id']}</code> | {o['stars']} ⭐ | Status: <b>{o['status']}</b>\n"
         if o['status'] == "pending_claim":
             kb.append([
-                create_button(f"✅ Approve {o['order_id']}", f"adm_app_{o['order_id']}", "success"),
-                create_button(f"❌ Reject", f"adm_rej_{o['order_id']}", "danger")
+                create_button(f"✅ Approve {o['order_id']}", f"adm_app_ord_{o['order_id']}", "success"),
+                create_button(f"❌ Reject", f"adm_rej_ord_{o['order_id']}", "danger")
             ])
 
     nav = []
@@ -685,10 +839,10 @@ async def cb_admin_orders(callback: CallbackQuery):
 
     await callback.message.edit_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
 
-@router.callback_query(F.data.startswith("adm_app_"))
+@router.callback_query(F.data.startswith("adm_app_ord_"))
 async def cb_admin_approve_order(callback: CallbackQuery):
     if not check_admin(callback.from_user.id): return
-    order_id = callback.data.split("adm_app_")[1]
+    order_id = callback.data.split("adm_app_ord_")[1]
 
     order = await orders_col.find_one_and_update(
         {"order_id": order_id, "status": "pending_claim"},
@@ -706,10 +860,10 @@ async def cb_admin_approve_order(callback: CallbackQuery):
 
     await cb_admin_orders(callback)
 
-@router.callback_query(F.data.startswith("adm_rej_"))
+@router.callback_query(F.data.startswith("adm_rej_ord_"))
 async def cb_admin_reject_order(callback: CallbackQuery):
     if not check_admin(callback.from_user.id): return
-    order_id = callback.data.split("adm_rej_")[1]
+    order_id = callback.data.split("adm_rej_ord_")[1]
 
     order = await orders_col.find_one_and_update(
         {"order_id": order_id, "status": "pending_claim"},
@@ -717,7 +871,6 @@ async def cb_admin_reject_order(callback: CallbackQuery):
     )
 
     if order:
-        # Refund user balance atomically
         await users_col.update_one({"user_id": order["user_id"]}, {"$inc": {"balance": order["price"]}})
         await callback.answer("Order Rejected & Refunded!", show_alert=True)
         try:
@@ -772,7 +925,7 @@ async def process_broadcast_execute(callback: CallbackQuery, state: FSMContext):
     kb = InlineKeyboardMarkup(inline_keyboard=[[create_button("⬅️ Admin Menu", "admin_main", "primary")]])
     await callback.message.edit_text(f"✅ <b>Broadcast Completed!</b>\n\n<b>Successful:</b> {success}\n<b>Failed:</b> {failed}", parse_mode="HTML", reply_markup=kb)
 
-# Admin: Stats & DB
+# Admin: Stats
 @router.callback_query(F.data == "admin_stats")
 async def cb_admin_stats(callback: CallbackQuery):
     if not check_admin(callback.from_user.id): return
@@ -783,7 +936,6 @@ async def cb_admin_stats(callback: CallbackQuery):
     completed_orders = await orders_col.count_documents({"status": "completed"})
     pending_orders = await orders_col.count_documents({"status": "pending_claim"})
 
-    # Aggregations
     pipeline_balance = [{"$group": {"_id": None, "total": {"$sum": "$balance"}}}]
     bal_res = await users_col.aggregate(pipeline_balance).to_list(1)
     total_balances = bal_res[0]["total"] if bal_res else 0.0
