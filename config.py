@@ -5,7 +5,7 @@ load_dotenv()
 
 # Bot Configuration
 BOT_TOKEN = os.getenv("BOT_TOKEN", "")
-BOT_USERNAME = os.getenv("BOT_USERNAME", "@StarsSellingBot")
+BOT_USERNAME = os.getenv("BOT_USERNAME", "@exesiners_bot")
 OWNER_USERNAME = os.getenv("OWNER_USERNAME", "@exesiner")
 SUPPORT_USERNAME = os.getenv("SUPPORT_USERNAME", "@exesiner")
 
